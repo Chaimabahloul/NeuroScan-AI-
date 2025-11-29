@@ -5,9 +5,11 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 import os
 
-# --------------------------
-# CONFIG
-# --------------------------
+# ----------------------------------------------------------------------
+# CONFIGURATION GÉNÉRALE
+# Définition des paramètres de base : taille des images, batch size,
+# nombre d'époques et chemins des répertoires nécessaires au projet.
+# ----------------------------------------------------------------------
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS = 25
@@ -18,9 +20,11 @@ TEST_DIR = "dataset/test"
 
 MODEL_PATH = "models/lung_model.h5"
 
-# --------------------------
-# DATASET + AUGMENTATION
-# --------------------------
+# ----------------------------------------------------------------------
+# DATASET ET AUGMENTATION
+# Préparation des générateurs pour le training, validation et test.
+# L'augmentation d'images permet d'améliorer la robustesse du modèle.
+# ----------------------------------------------------------------------
 
 train_datagen = ImageDataGenerator(
     rescale=1./255,
@@ -31,9 +35,11 @@ train_datagen = ImageDataGenerator(
     horizontal_flip=True
 )
 
+# Validation et test n’utilisent pas d’augmentation pour garantir l’objectivité.
 val_datagen = ImageDataGenerator(rescale=1./255)
 test_datagen = ImageDataGenerator(rescale=1./255)
 
+# Chargement des données depuis les dossiers organisés train/val/test.
 train_gen = train_datagen.flow_from_directory(
     TRAIN_DIR,
     target_size=(IMG_SIZE, IMG_SIZE),
@@ -48,6 +54,7 @@ val_gen = val_datagen.flow_from_directory(
     class_mode="categorical"
 )
 
+# Le set de test est chargé sans mélange afin de permettre une évaluation correcte.
 test_gen = test_datagen.flow_from_directory(
     TEST_DIR,
     target_size=(IMG_SIZE, IMG_SIZE),
@@ -56,13 +63,16 @@ test_gen = test_datagen.flow_from_directory(
     shuffle=False
 )
 
+# Nombre automatique de classes détectées à partir des sous-dossiers.
 num_classes = len(train_gen.class_indices)
 
 print("\nClasses détectées :", train_gen.class_indices)
 
-# --------------------------
-# MODEL CNN
-# --------------------------
+# ----------------------------------------------------------------------
+# CONSTRUCTION DU MODÈLE CNN
+# Architecture simple et efficace incluant BatchNormalization pour
+# stabiliser l'apprentissage et Dropout pour réduire l'overfitting.
+# ----------------------------------------------------------------------
 
 model = Sequential([
     Conv2D(32, (3,3), activation="relu", input_shape=(IMG_SIZE, IMG_SIZE, 3)),
@@ -79,10 +89,11 @@ model = Sequential([
 
     Flatten(),
     Dense(256, activation="relu"),
-    Dropout(0.4),
-    Dense(num_classes, activation="softmax")
+    Dropout(0.4),  # permet de limiter l’overfitting
+    Dense(num_classes, activation="softmax")  # sortie multiclasses
 ])
 
+# Compilation du modèle avec Adam et ajout de précision/rappel comme métriques.
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
     loss="categorical_crossentropy",
@@ -91,9 +102,11 @@ model.compile(
 
 model.summary()
 
-# --------------------------
+# ----------------------------------------------------------------------
 # CALLBACKS
-# --------------------------
+# ModelCheckpoint : sauvegarde automatique du meilleur modèle.
+# EarlyStopping : arrête l’entraînement si la validation stagne.
+# ----------------------------------------------------------------------
 
 os.makedirs("models", exist_ok=True)
 
@@ -105,14 +118,15 @@ checkpoint = ModelCheckpoint(
 )
 
 early_stop = EarlyStopping(
-    patience=6,
-    monitor="val_loss",
+    patience=6,             # nombre d'époques sans amélioration avant arrêt
+    monitor="val_loss",     # critère utilisé pour décider l’arrêt
     restore_best_weights=True
 )
 
-# --------------------------
-# TRAINING
-# --------------------------
+# ----------------------------------------------------------------------
+# ENTRAINEMENT DU MODÈLE
+# Les callbacks permettent un entraînement plus efficace et contrôlé.
+# ----------------------------------------------------------------------
 
 history = model.fit(
     train_gen,
@@ -121,9 +135,10 @@ history = model.fit(
     callbacks=[checkpoint, early_stop]
 )
 
-# --------------------------
-# TEST EVALUATION
-# --------------------------
+# ----------------------------------------------------------------------
+# ÉVALUATION SUR LE TEST SET
+# Le test final fournit les métriques globales de performance.
+# ----------------------------------------------------------------------
 
 print("\nÉvaluation sur TEST SET :\n")
 test_loss, test_acc, test_prec, test_rec = model.evaluate(test_gen)
